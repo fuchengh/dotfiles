@@ -66,7 +66,8 @@ plugins=(
 	git
 	zsh-autosuggestions 
 	history-substring-search
-       	shrink-path 
+	z
+    shrink-path 
 	zsh-syntax-highlighting
 )
 
