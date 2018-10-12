@@ -67,6 +67,8 @@ plugins=(
 	zsh-autosuggestions 
 	history-substring-search
 	z
+	colored-man-pages
+	extract
     shrink-path 
 	zsh-syntax-highlighting
 )
