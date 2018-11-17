@@ -1,65 +1,78 @@
-set nu
-set ai
-set cursorline
-set tabstop=4
-set paste
-set hlsearch
-set ignorecase
-set expandtab
+let vim_plug_just_installed = 0
+let vim_plug_path = expand('~/.vim/autoload/plug.vim')
+if !filereadable(vim_plug_path)
+    echo "Installing Vim-plug..."
+    echo ""
+    silent !mkdir -p ~/.vim/autoload
+    silent !curl -fLo ~/.vim/autoload/plug.vim --create-dirs https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+    let vim_plug_just_installed = 1
+endif
 
-let g:lightline = {
-      \ 'colorscheme': 'onedark',
-      \ }
+" manually load vim-plug the first time
+if vim_plug_just_installed
+    :execute 'source '.fnameescape(vim_plug_path)
+endif
 
-
-" Plugin configuration
-call plug#begin('~/.config/nvim/plugged')
-
-Plug 'junegunn/fzf', { 'dir': '~/.fzf', 'do': './install --all' }
-Plug 'junegunn/fzf.vim'
-
-Plug 'scrooloose/nerdtree'
-Plug 'jistr/vim-nerdtree-tabs'
+call plug#begin('~/.vim/plugged')
 Plug 'joshdick/onedark.vim'
-Plug 'sheerun/vim-polyglot'
 Plug 'itchyny/lightline.vim'
-Plug 'Valloric/YouCompleteMe', { 'for': 'go' }
-Plug 'fatih/vim-go', { 'do': ':GoUpdateBinaries' }
-
 call plug#end()
 
-colorscheme onedark
-syntax enable
 
-" NERDTree config
-"open a NERDTree automatically when vim starts up if no files were specified
-autocmd StdinReadPre * let s:std_in=1
-autocmd VimEnter * if argc() == 0 && !exists("s:std_in") | NERDTree | endif
-"open NERDTree automatically when vim starts up on opening a directory
-autocmd StdinReadPre * let s:std_in=1
-autocmd VimEnter * if argc() == 1 && isdirectory(argv()[0]) && !exists("s:std_in") | exe 'NERDTree' argv()[0] | wincmd p | ene | endif
-"map F2 to open NERDTree
-map <F2> :NERDTreeToggle<CR>
-"close vim if the only window left open is a NERDTree
-autocmd bufenter * if (winnr("$") == 1 && exists("b:NERDTree") && b:NERDTree.isTabTree()) | q | endif
+if vim_plug_just_installed
+    echo "Installing Bundles, please ignore key map error messages"
+    :PlugInstall
+endif
 
+set nocompatible
 
-set smarttab
-set shiftwidth=4
+filetype plugin on
+filetype indent on
+
+set expandtab
 set tabstop=4
 set softtabstop=4
-autocmd FileType go set expandtab
+set shiftwidth=4
+set paste
 
-set completeopt=longest,menu
+" tab length exceptions on some file types
+autocmd FileType html setlocal shiftwidth=4 tabstop=4 softtabstop=4
+autocmd FileType htmldjango setlocal shiftwidth=4 tabstop=4 softtabstop=4
+autocmd FileType javascript setlocal shiftwidth=4 tabstop=4 softtabstop=4
 
-tnoremap <Esc> <C-\><C-n>
-nnoremap <Tab> <C-W>w
-nnoremap <Tab> <C-W><C-W>
-inoremap <Tab> <C-W>w
-inoremap <Tab> <C-W><C-W>
-nnoremap <C-w>o :below 10sp term://$SHELL<cr>
-nnoremap <C-Left> :tabprevious<CR>
-nnoremap <C-Right> :tabnext<CR>
+" always show status bar
+set ls=2
 
-autocmd BufEnter term://* startinsert
+" incremental search
+set incsearch
+" highlighted search results
+set hlsearch
+
+" syntax highlight on
+syntax on
+
+" show line numbers
+set nu
+
+ca w!! w !sudo tee "%"
+
+" when scrolling, keep cursor 3 lines away from screen border
+set scrolloff=3
+
+" autocompletion of files and commands behaves like shell
+" (complete only the common part, list the options that match)
+set wildmode=list:longest
+
+syntax on
+colorscheme onedark
+let g:lightline = {
+      \ 'colorscheme': 'onedark',
+      \ 'active': {
+      \   'left': [ [ 'mode', 'paste' ],
+      \             [ 'gitbranch', 'readonly', 'filename', 'modified' ] ]
+      \ },
+      \ 'component_function': {
+      \   'gitbranch': 'fugitive#head'
+      \ },
+      \ }
 
