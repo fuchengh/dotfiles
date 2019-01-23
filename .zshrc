@@ -2,13 +2,13 @@
 # export PATH=$HOME/bin:/usr/local/bin:$PATH
 
 # Path to your oh-my-zsh installation.
-  export ZSH="/u/cs/105/0513328/.oh-my-zsh"
+export ZSH="/home/asd2260123/.oh-my-zsh"
 
 # Set name of the theme to load --- if set to "random", it will
 # load a random theme each time oh-my-zsh is loaded, in which case,
 # to know which specific one was loaded, run: echo $RANDOM_THEME
 # See https://github.com/robbyrussell/oh-my-zsh/wiki/Themes
-ZSH_THEME="agnoster"
+ZSH_THEME="bullet-train"
 
 # Set list of themes to pick from when loading at random
 # Setting this variable when ZSH_THEME=random will cause zsh to load
@@ -67,8 +67,8 @@ plugins=(
 	zsh-autosuggestions 
 	history-substring-search
 	z
-	extract
 	colored-man-pages
+	extract
     shrink-path 
 	zsh-syntax-highlighting
 )
@@ -103,5 +103,4 @@ source $ZSH/oh-my-zsh.sh
 # Example aliases
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
-alias py="python3"
-alias diskusage="du -sh"
+alias vim="nvim"
