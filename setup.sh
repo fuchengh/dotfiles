@@ -24,6 +24,9 @@ git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:
 
 
 # Move setting files
+sudo chown "$USER" -R ~/.oh-my-zsh/
+
 cp .zshrc ~
 cp .vimrc ~
 cp bullet-train.zsh-theme ~/.oh-my-zsh/themes/
+
