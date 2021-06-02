@@ -1,19 +1,25 @@
 # Install prerequisite
-sudo apt install git
-sudo apt install curl
+sudo apt update
+sudo apt install git -y
+sudo apt install curl -y
+
+# Install thefuck for correcting errors in previous commands
+sudo apt install python3-dev python3-pip python3-setuptools -y
+sudo pip3 install thefuck -y
 
 # Install zsh
-sudo apt install zsh
+sudo apt install zsh -y
 
 # Install Vim
-sudo apt install vim
+sudo apt install vim -y
 
 # Install Vim Plugin
 curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
 	    https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
 
 # Install Oh-my-zsh
-sh -c "$(curl -fsSL https://raw.github.com/robbyrussell/oh-my-zsh/master/tools/install.sh)"
+wget https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh
+sh ./install.sh --unattend
 
 # Install zsh plugins
 git clone https://github.com/zsh-users/zsh-history-substring-search ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-history-substring-search
@@ -30,3 +36,5 @@ cp .zshrc ~
 cp .vimrc ~
 cp bullet-train.zsh-theme ~/.oh-my-zsh/themes/
 
+chsh -s /usr/bin/zsh "$USER"
+# You will need to re-login to apply this config
