@@ -38,3 +38,5 @@ cp bullet-train.zsh-theme ~/.oh-my-zsh/themes/
 
 chsh -s /usr/bin/zsh "$USER"
 # You will need to re-login to apply this config
+rm install.sh
+sudo apt install fonts-hack-ttf
