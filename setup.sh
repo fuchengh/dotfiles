@@ -3,9 +3,7 @@ sudo apt update
 sudo apt install git -y
 sudo apt install curl -y
 
-# Install thefuck for correcting errors in previous commands
 sudo apt install python3-dev python3-pip python3-setuptools -y
-sudo pip3 install thefuck -y
 
 # Install zsh
 sudo apt install zsh -y
@@ -37,6 +35,7 @@ cp .vimrc ~
 cp bullet-train.zsh-theme ~/.oh-my-zsh/themes/
 
 chsh -s /usr/bin/zsh "$USER"
-# You will need to re-login to apply this config
 rm install.sh
-sudo apt install fonts-hack-ttf
+sudo apt install fonts-hack-ttf -y
+sudo apt install thefuck -y
+# You will need to re-login to apply this config
