@@ -9,7 +9,7 @@ ZSH_PLUGIN_BASE="${ZSH_CUSTOM:-${HOME}/.oh-my-zsh/custom}/plugins/"
 # Install prerequisite and some frequently used tools
 echo "[-] Installing packages..."
 sudo apt-get -qq update
-sudo apt-get -qq install -y git curl bat software-properties-common
+sudo apt-get -qq install -y git curl bat fzf software-properties-common
 sudo apt-get -qq install -y python3-dev python3-pip python3-setuptools
 sudo apt-get -qq install -y zsh vim
 sudo apt-get -qq autoremove -y
@@ -44,7 +44,7 @@ done
 
 
 # ===================== Plugins =====================
-echo "[PLUGIN] Installing plugins for zsh and vim..."
+echo "\n[PLUGIN] Installing plugins for zsh and vim..."
 # Install Vim Plugin
 curl -sfLo "${HOME}/.vim/autoload/plug.vim" --create-dirs \
 https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
@@ -67,6 +67,8 @@ for plug in ${ZSH_PLUGINS[@]}; do
         git clone "https://github.com/zsh-users/${plug}" "${ZSH_PLUGING_BASE}${plug}"
     fi
 done
+# Install p10k
+git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k
 
 
 # ================ Move config files ================
