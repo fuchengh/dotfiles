@@ -64,7 +64,7 @@ for plug in ${ZSH_PLUGINS[@]}; do
     if [ -d "${ZSH_PLUGIN_BASE}${plug}" ]; then
         echo "[ZSH] Plugin ${plug} has already been installed, ignoring..."
     else
-        git clone "https://github.com/zsh-users/${plug}" "${ZSH_PLUGING_BASE}${plug}"
+        git clone "https://github.com/zsh-users/${plug}" "${ZSH_PLUGIN_BASE}${plug}"
     fi
 done
 # Install p10k
