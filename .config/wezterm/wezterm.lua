@@ -16,6 +16,17 @@ config.use_fancy_tab_bar = true
 config.tab_bar_at_bottom = false
 config.hide_tab_bar_if_only_one_tab = false
 config.scrollback_lines = 100000
+config.initial_rows = 32
+config.initial_cols = 133
+config.audible_bell = "Disabled"
+config.visual_bell = {
+  fade_in_duration_ms = 75,
+  fade_out_duration_ms = 75,
+  target = 'CursorColor',
+}
+config.colors = {
+  visual_bell = '#202020',
+}
 config.window_frame = {
     -- Fonts for the tab bar
     font = wezterm.font {
