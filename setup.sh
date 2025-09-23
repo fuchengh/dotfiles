@@ -12,7 +12,7 @@ ZSH_PLUGIN_BASE="${ZSH_CUSTOM_DIR}/plugins"
 ZSH_THEME_BASE="${ZSH_CUSTOM_DIR}/themes"
 FONT_BASE="https://github.com/ryanoasis/nerd-fonts/raw/master/patched-fonts"
 
-# Menu defaults
+# Menu defaults (you can change these)
 DO_FONTS=0
 DO_NVIM=1
 DO_P10K=1
@@ -28,7 +28,7 @@ ZSH_PLUGINS=(
   "Aloxaf/fzf-tab"
 )
 
-# Nerd fonts for Linux (direct URLs)
+# Nerd fonts for Linux (direct paths inside Nerd Fonts repo)
 NERD_FONTS_LINUX=(
   "RobotoMono/Regular/RobotoMonoNerdFont-Regular.ttf"
   "RobotoMono/Regular/RobotoMonoNerdFontMono-Regular.ttf"
@@ -71,7 +71,6 @@ confirm() {
   [[ -z "$ans" ]] && ans="$d"
   case "$ans" in y|Y|yes|YES) return 0;; *) return 1;; esac
 }
-
 ask_menu() {
   echo "Select tasks (y/N default: N)"
   confirm "Install Nerd Fonts?" N && DO_FONTS=1 || DO_FONTS=0
@@ -81,10 +80,20 @@ ask_menu() {
   confirm "Install/verify zsh plugins (git clone)?" Y && DO_ZSH_PLUGINS=1 || DO_ZSH_PLUGINS=0
 }
 
-# ---------- Version helpers ----------
+# ---------- NVIM helpers ----------
+nvim_bin_path() {
+  if [[ -x "${HOME_DIR}/.local/bin/nvim" ]]; then
+    echo "${HOME_DIR}/.local/bin/nvim"
+  elif command -v nvim >/dev/null 2>&1; then
+    command -v nvim
+  else
+    echo ""
+  fi
+}
 nvim_version_minor() {
-  if command -v nvim >/dev/null 2>&1; then
-    nvim --version | awk 'NR==1{match($0,/NVIM v([0-9]+)\.([0-9]+)/,a); if(a[2]!=""){print a[2]} else {print 0}}'
+  local bin="${1:-$(nvim_bin_path)}"
+  if [[ -n "$bin" && -x "$bin" ]]; then
+    "$bin" --version | awk 'NR==1{match($0,/NVIM v([0-9]+)\.([0-9]+)/,a); if(a[2]!=""){print a[2]} else {print 0}}'
   else
     echo 0
   fi
@@ -115,7 +124,6 @@ install_base_tools_linux() {
     ok "Created ~/.local/bin/fd -> fdfind"
   fi
 }
-
 install_base_tools_macos() {
   if [[ $have_brew -eq 0 ]]; then
     warn "Homebrew not found; skipping package installs. Install from https://brew.sh"
@@ -140,7 +148,6 @@ install_base_tools_macos() {
     fi
   fi
 }
-
 install_base_tools() {
   if is_linux;  then install_base_tools_linux;  fi
   if is_macos;  then install_base_tools_macos;  fi
@@ -159,59 +166,27 @@ install_fonts_linux() {
   fc-cache -f >/dev/null || true
   ok "Fonts installed under ${font_dir}"
 }
-
 install_fonts_macos() {
   if [[ $have_brew -eq 0 ]]; then
     warn "Homebrew not found; skipping font install on macOS."
     return
   fi
-  info "Installing Nerd Fonts via Homebrew Cask (no tap)..."
+  info "Installing Nerd Fonts via Homebrew Cask..."
   local casks=(
     font-roboto-mono-nerd-font
     font-hack-nerd-font
     font-caskaydia-cove-nerd-font
-    font-caskaydia-mono-nerd-font
-    font-maple-mono
-    font-maple-mono-nf
-    font-maple-mono-nf-cn
   )
   for c in "${casks[@]}"; do
     if brew list --cask "$c" >/dev/null 2>&1; then
       ok "$c already installed."
-      continue
-    fi
-    if brew install --cask "$c"; then
-      ok "Installed $c via brew."
     else
-      warn "Brew failed for $c; falling back to direct download."
-      manual_install_font_macos "$c"
+      brew install --cask "$c" || warn "Failed to install $c (you can install manually later)."
     fi
   done
   ok "Fonts ready on macOS."
 }
-
-# Fallback: map cask name -> upstream Nerd Fonts zip, install to ~/Library/Fonts
-manual_install_font_macos() {
-  local cask="$1" zip=""
-  case "$cask" in
-    font-roboto-mono-nerd-font)   zip="RobotoMono.zip" ;;
-    font-hack-nerd-font)          zip="Hack.zip" ;;
-    font-caskaydia-cove-nerd-font) zip="CaskaydiaCove.zip" ;; # Nerd Fonts uses this zip name for Caskaydia
-    *) warn "No fallback mapping for $cask"; return 0 ;;
-  esac
-  local dst="$HOME/Library/Fonts"
-  ensure_dir "$dst"
-  local tmp="/tmp/$zip"
-  # Use the official 'latest' release URL structure
-  if curl -fsSL -o "$tmp" "https://github.com/ryanoasis/nerd-fonts/releases/latest/download/$zip"; then
-    /usr/bin/unzip -qo "$tmp" "*.ttf" -d "$dst" || warn "unzip failed for $zip"
-    rm -f "$tmp"
-    ok "Installed $cask from upstream release into $dst"
-  else
-    warn "Download failed for $zip; please install manually from https://www.nerdfonts.com/font-downloads"
-  fi
-}
-
+manual_install_font_macos() { :; }  # reserved; no-op
 install_fonts() {
   [[ $DO_FONTS -eq 1 ]] || return 0
   if is_linux; then install_fonts_linux; fi
@@ -220,11 +195,8 @@ install_fonts() {
 
 # ---------- Oh My Zsh ----------
 ensure_oh_my_zsh() {
-  if [[ -d "${HOME_DIR}/.oh-my-zsh" ]]; then
-    ok "Oh My Zsh already installed."
-    return
-  fi
-  info "Installing Oh My Zsh..."
+  if [[ -d "${HOME_DIR}/.oh-my-zsh" ]]; then ok "Oh My Zsh already installed."; return; fi
+  info "Installing Oh My Zsh (unattended)..."
   RUNZSH=no CHSH=no KEEP_ZSHRC=yes \
   sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended || true
 }
@@ -238,7 +210,6 @@ ensure_zsh_plugin_repo() {
     git clone --depth=1 "https://github.com/${repo}.git" "${dest}"
   fi
 }
-
 install_zsh_plugins() {
   [[ $DO_ZSH_PLUGINS -eq 1 ]] || return 0
   ensure_oh_my_zsh
@@ -276,132 +247,122 @@ set_default_shell_zsh() {
 
 # ---------- Editor configs ----------
 deploy_editor_configs() {
-  [[ -f "${REPO_DIR}/.vimrc"          ]] && cp -f "${REPO_DIR}/.vimrc"          "${HOME_DIR}/.vimrc"
-  [[ -f "${REPO_DIR}/.clang-format"   ]] && cp -f "${REPO_DIR}/.clang-format"   "${HOME_DIR}/.clang-format"
-  [[ -f "${REPO_DIR}/.zshrc"          ]] && cp -f "${REPO_DIR}/.zshrc"          "${HOME_DIR}/.zshrc"
+  [[ -f "${REPO_DIR}/.vimrc"        ]] && cp -f "${REPO_DIR}/.vimrc"        "${HOME_DIR}/.vimrc"
+  [[ -f "${REPO_DIR}/.clang-format" ]] && cp -f "${REPO_DIR}/.clang-format" "${HOME_DIR}/.clang-format"
+  [[ -f "${REPO_DIR}/.zshrc"        ]] && cp -f "${REPO_DIR}/.zshrc"        "${HOME_DIR}/.zshrc"
   if [[ -d "${REPO_DIR}/.config/nvim" ]]; then
     ensure_dir "${HOME_DIR}/.config"
     rsync -a --delete "${REPO_DIR}/.config/nvim/" "${HOME_DIR}/.config/nvim/"
   fi
 }
-
 install_vim_plug() {
-  curl -fsSLo "${HOME_DIR}/.vim/autoload/plug.vim"           --create-dirs https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
-  curl -fsSLo "${HOME_DIR}/.local/share/nvim/site/autoload/plug.vim" --create-dirs https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+  curl -fsSLo "${HOME_DIR}/.vim/autoload/plug.vim"                        --create-dirs https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+  curl -fsSLo "${HOME_DIR}/.local/share/nvim/site/autoload/plug.vim"     --create-dirs https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
 }
 
-install_editor_plugins() {
-  if command -v vim  >/dev/null 2>&1; then info "Installing Vim plugins via vim-plug...";  vim +PlugInstall +qall || true; fi
-  if command -v nvim >/dev/null 2>&1; then
-    info "Installing Neovim plugins via vim-plug..."
-    nvim --headless "+PlugInstall --sync" "+TSUpdate" +qa || true
-  fi
-  info "Editor plugins installation done."
-}
-
-# ---------- Neovim (latest) ----------
-# 1) replace your install_neovim_linux_latest() with this:
-install_neovim_linux_latest() {
-  info "Ensuring Neovim >= 0.11 on Linux..."
-
-  # Allow override: NVIM_LINUX_INSTALL=appimage|ppa|auto (default auto)
-  local mode="${NVIM_LINUX_INSTALL:-auto}"
-
-  if [[ "$mode" == "appimage" ]]; then
-    install_neovim_appimage
-    return
-  fi
-
-  # Only try PPA on Ubuntu with add-apt-repository present, guard with timeout
-  if grep -qi 'ubuntu' /etc/os-release && command -v add-apt-repository >/dev/null 2>&1; then
-    info "Trying Ubuntu PPA (neovim-ppa/stable)..."
-    sudo apt-get -qq update
-    sudo apt-get -qq install -y software-properties-common ca-certificates || true
-
-    local add_ok=0
-    if command -v timeout >/dev/null 2>&1; then
-      sudo timeout 25s add-apt-repository -y ppa:neovim-ppa/stable && add_ok=1 || true
-    else
-      sudo add-apt-repository -y ppa:neovim-ppa/stable && add_ok=1 || true
-    fi
-
-    if [[ $add_ok -eq 1 ]]; then
-      sudo apt-get -qq update
-      sudo apt-get -qq install -y neovim || true
-    else
-      warn "PPA add failed or timed out; falling back to direct download."
-      install_neovim_appimage
-      return
-    fi
-  else
-    warn "Non-Ubuntu or add-apt-repository missing; using direct download."
-    install_neovim_appimage
-    return
-  fi
-
-  # Verify version; fallback if still too old
-  local minor; minor="$(nvim_version_minor || echo 0)"
-  if [[ "${minor:-0}" -lt 11 ]]; then
-    warn "Neovim still < 0.11; switching to direct download."
-    install_neovim_appimage
-  else
-    ok "Neovim $(nvim --version | head -1) OK"
-  fi
-}
-
-# 2) add/replace this function (arch-aware AppImage/Tarball with fallback):
-install_neovim_appimage() {
+# ---------- Neovim (installers) ----------
+install_neovim_tarball() {
   ensure_dir "${HOME_DIR}/.local/bin"
-
-  # Detect arch (override via NVIM_LINUX_ARCH=aarch64|x86_64 if needed)
-  local raw_arch="${NVIM_LINUX_ARCH:-$(uname -m)}" arch_tag=""
-  case "$raw_arch" in
+  ensure_dir "${HOME_DIR}/.local/opt"
+  local arch_tag=""
+  case "$(uname -m)" in
     x86_64|amd64) arch_tag="x86_64" ;;
     aarch64|arm64) arch_tag="arm64" ;;
-    *)
-      warn "Unknown arch '${raw_arch}', defaulting to x86_64"; arch_tag="x86_64" ;;
+    *) warn "Unknown arch, defaulting to x86_64"; arch_tag="x86_64" ;;
   esac
-
+  local base="https://github.com/neovim/neovim/releases/latest/download"
+  local tar="nvim-linux-${arch_tag}.tar.gz"
+  info "Installing Neovim from tarball (${tar}) ..."
+  curl -fsSL -o "/tmp/${tar}" "${base}/${tar}"
+  (cd "${HOME_DIR}/.local/opt" && rm -rf "nvim-linux-${arch_tag}" && tar -xzf "/tmp/${tar}")
+  ln -sf "${HOME_DIR}/.local/opt/nvim-linux-${arch_tag}/bin/nvim" "${HOME_DIR}/.local/bin/nvim"
+  rm -f "/tmp/${tar}"
+  ok "Neovim tarball installed -> ~/.local/bin/nvim"
+  case ":$PATH:" in *":${HOME_DIR}/.local/bin:"*) :;; *) warn "Add ~/.local/bin to PATH in your shell rc.";; esac
+}
+install_neovim_appimage() {
+  ensure_dir "${HOME_DIR}/.local/bin"
+  ensure_dir "${HOME_DIR}/.local/opt"
+  local arch_tag=""
+  case "$(uname -m)" in
+    x86_64|amd64) arch_tag="x86_64" ;;
+    aarch64|arm64) arch_tag="arm64" ;;
+    *) warn "Unknown arch, defaulting to x86_64"; arch_tag="x86_64" ;;
+  esac
   local base="https://github.com/neovim/neovim/releases/latest/download"
   local app="nvim-linux-${arch_tag}.appimage"
-  local tar="nvim-linux-${arch_tag}.tar.gz"
-
-  info "Trying AppImage (${app}) ..."
   local app_tmp="/tmp/${app}"
-  if curl -fsSL -o "${app_tmp}" "${base}/${app}"; then
-    chmod +x "${app_tmp}"
-    # Extract (works without FUSE)
-    "${app_tmp}" --appimage-extract >/dev/null
-    mv -f squashfs-root/usr/bin/nvim "${HOME_DIR}/.local/bin/nvim"
-    rm -rf squashfs-root "${app_tmp}"
-    ok "Installed Neovim AppImage to ~/.local/bin/nvim"
-  else
-    warn "AppImage not available (HTTP error). Falling back to tarball (${tar})..."
-    local tar_tmp="/tmp/${tar}"
-    if curl -fsSL -o "${tar_tmp}" "${base}/${tar}"; then
-      # Extract tarball into ~/.local and link to ~/.local/bin/nvim
-      (cd "${HOME_DIR}/.local" && tar -xzf "${tar_tmp}")
-      ln -sf "${HOME_DIR}/.local/nvim-linux-${arch_tag}/bin/nvim" "${HOME_DIR}/.local/bin/nvim"
-      rm -f "${tar_tmp}"
-      ok "Installed Neovim tarball and symlinked ~/.local/bin/nvim"
-    else
-      error "Failed to download both AppImage and tarball. Check network/proxy."
-      return 1
-    fi
+  info "Installing Neovim via AppImage (${app}) ..."
+  curl -fsSL -o "${app_tmp}" "${base}/${app}"
+  chmod +x "${app_tmp}"
+  local appdir="${HOME_DIR}/.local/opt/nvim-appimage-${arch_tag}"
+  rm -rf "${appdir}"; mkdir -p "${appdir}"
+  (cd "${appdir}" && "${app_tmp}" --appimage-extract >/dev/null)
+  rm -f "${app_tmp}"
+  ln -sf "${appdir}/squashfs-root/AppRun" "${HOME_DIR}/.local/bin/nvim"
+  ok "Neovim AppImage installed -> ~/.local/bin/nvim (AppRun)"
+  case ":$PATH:" in *":${HOME_DIR}/.local/bin:"*) :;; *) warn "Add ~/.local/bin to PATH in your shell rc.";; esac
+}
+install_neovim_ppa_with_timeout() {
+  if ! grep -qi 'ubuntu' /etc/os-release || ! command -v add-apt-repository >/dev/null 2>&1; then
+    warn "PPA method unavailable on this system."; return 1
   fi
-
-  case ":$PATH:" in
-    *":${HOME_DIR}/.local/bin:"*) :;;
-    *) warn "Add ~/.local/bin to PATH in your shell rc.";;
-  esac
+  info "Trying Ubuntu PPA (neovim-ppa/stable) with timeout..."
+  sudo apt-get -qq update
+  sudo apt-get -qq install -y software-properties-common ca-certificates || true
+  local add_ok=0
+  if command -v timeout >/dev/null 2>&1; then
+    sudo timeout 25s add-apt-repository -y ppa:neovim-ppa/stable && add_ok=1 || true
+  else
+    sudo add-apt-repository -y ppa:neovim-ppa/stable && add_ok=1 || true
+  fi
+  [[ $add_ok -eq 1 ]] || { warn "PPA add failed or timed out."; return 1; }
+  sudo apt-get -qq update
+  sudo apt-get -qq install -y neovim || true
 }
 
+# ---------- Neovim (latest orchestrator) ----------
+install_neovim_linux_latest() {
+  info "Ensuring Neovim >= 0.11 on Linux..."
+  # NVIM_LINUX_INSTALL=tarball|appimage|ppa|auto (default auto)
+  local mode="${NVIM_LINUX_INSTALL:-auto}"
+  case "$mode" in
+    tarball)  install_neovim_tarball   || { error "Tarball install failed."; return 1; } ;;
+    appimage) install_neovim_appimage  || { error "AppImage install failed."; return 1; } ;;
+    ppa)      install_neovim_ppa_with_timeout || { error "PPA path failed."; return 1; } ;;
+    auto|*)   install_neovim_tarball || { warn "Tarball failed; trying AppImage..."; install_neovim_appimage || { warn "AppImage failed; trying PPA..."; install_neovim_ppa_with_timeout || error "All Neovim install methods failed."; }; } ;;
+  esac
+
+  # Verify version & runtime
+  local NVBIN; NVBIN="$(nvim_bin_path)"
+  if [[ -z "$NVBIN" ]]; then error "nvim not found in PATH after install"; return 1; fi
+  local minor; minor="$(nvim_version_minor "$NVBIN")"
+  if [[ "$minor" -lt 11 ]]; then warn "Neovim still < 0.11 (minor=$minor)."; fi
+  local vr; vr="$("$NVBIN" --headless -u NONE +"echo \$VIMRUNTIME" +qa 2>/dev/null || true)"
+  if [[ -z "$vr" || ! -d "$vr" ]]; then error "VIMRUNTIME not found (got '$vr'). Runtime is broken."; return 1; fi
+  ok "Neovim OK. VIMRUNTIME=$vr"
+}
 install_neovim_macos() {
   [[ $have_brew -eq 1 ]] || { warn "brew missing; skip Neovim"; return; }
   brew install neovim >/dev/null || true
   ok "Neovim $(nvim --version | head -1)"
 }
 
+# ---------- Editors pipeline ----------
+install_editor_plugins() {
+  if command -v vim >/dev/null 2>&1; then
+    info "Installing Vim plugins via vim-plug..."
+    vim +PlugInstall +qall || true
+  fi
+  local NVBIN; NVBIN="$(nvim_bin_path)"
+  if [[ -n "$NVBIN" ]]; then
+    info "Installing Neovim plugins via vim-plug..."
+    "$NVBIN" --headless "+PlugInstall --sync" "+TSUpdate" +qa || true
+  else
+    warn "Neovim binary not found; skipping Neovim plugin install."
+  fi
+  info "Editor plugins installation done."
+}
 setup_editors() {
   [[ $DO_NVIM -eq 1 ]] || return 0
   if is_linux; then install_neovim_linux_latest; fi
