@@ -300,19 +300,19 @@ install_editor_plugins() {
 }
 
 # ---------- Neovim (latest) ----------
+# 1) replace your install_neovim_linux_latest() with this:
 install_neovim_linux_latest() {
   info "Ensuring Neovim >= 0.11 on Linux..."
 
   # Allow override: NVIM_LINUX_INSTALL=appimage|ppa|auto (default auto)
   local mode="${NVIM_LINUX_INSTALL:-auto}"
 
-  # If user forces appimage, skip PPA entirely
   if [[ "$mode" == "appimage" ]]; then
     install_neovim_appimage
     return
   fi
 
-  # Only try PPA on Ubuntu AND add-apt-repository exists
+  # Only try PPA on Ubuntu with add-apt-repository present, guard with timeout
   if grep -qi 'ubuntu' /etc/os-release && command -v add-apt-repository >/dev/null 2>&1; then
     info "Trying Ubuntu PPA (neovim-ppa/stable)..."
     sudo apt-get -qq update
@@ -320,26 +320,21 @@ install_neovim_linux_latest() {
 
     local add_ok=0
     if command -v timeout >/dev/null 2>&1; then
-      # Guard against hangs (25s)
-      if sudo timeout 25s add-apt-repository -y ppa:neovim-ppa/stable; then
-        add_ok=1
-      fi
+      sudo timeout 25s add-apt-repository -y ppa:neovim-ppa/stable && add_ok=1 || true
     else
-      if sudo add-apt-repository -y ppa:neovim-ppa/stable; then
-        add_ok=1
-      fi
+      sudo add-apt-repository -y ppa:neovim-ppa/stable && add_ok=1 || true
     fi
 
     if [[ $add_ok -eq 1 ]]; then
       sudo apt-get -qq update
       sudo apt-get -qq install -y neovim || true
     else
-      warn "PPA add failed or timed out; falling back to AppImage."
+      warn "PPA add failed or timed out; falling back to direct download."
       install_neovim_appimage
       return
     fi
   else
-    warn "Non-Ubuntu or add-apt-repository missing; using AppImage."
+    warn "Non-Ubuntu or add-apt-repository missing; using direct download."
     install_neovim_appimage
     return
   fi
@@ -347,24 +342,54 @@ install_neovim_linux_latest() {
   # Verify version; fallback if still too old
   local minor; minor="$(nvim_version_minor || echo 0)"
   if [[ "${minor:-0}" -lt 11 ]]; then
-    warn "Neovim still < 0.11; switching to AppImage."
+    warn "Neovim still < 0.11; switching to direct download."
     install_neovim_appimage
   else
     ok "Neovim $(nvim --version | head -1) OK"
   fi
 }
 
+# 2) add/replace this function (arch-aware AppImage/Tarball with fallback):
 install_neovim_appimage() {
   ensure_dir "${HOME_DIR}/.local/bin"
-  local appimg="/tmp/nvim.appimage"
-  info "Installing Neovim via AppImage to ~/.local/bin/nvim"
-  curl -fsSL -o "${appimg}" "https://github.com/neovim/neovim/releases/latest/download/nvim.appimage"
-  chmod +x "${appimg}"
-  # No FUSE needed; extract and move the real binary
-  "${appimg}" --appimage-extract >/dev/null
-  mv -f squashfs-root/usr/bin/nvim "${HOME_DIR}/.local/bin/nvim"
-  rm -rf squashfs-root "${appimg}"
-  ok "Installed Neovim AppImage to ~/.local/bin/nvim"
+
+  # Detect arch (override via NVIM_LINUX_ARCH=aarch64|x86_64 if needed)
+  local raw_arch="${NVIM_LINUX_ARCH:-$(uname -m)}" arch_tag=""
+  case "$raw_arch" in
+    x86_64|amd64) arch_tag="x86_64" ;;
+    aarch64|arm64) arch_tag="arm64" ;;
+    *)
+      warn "Unknown arch '${raw_arch}', defaulting to x86_64"; arch_tag="x86_64" ;;
+  esac
+
+  local base="https://github.com/neovim/neovim/releases/latest/download"
+  local app="nvim-linux-${arch_tag}.appimage"
+  local tar="nvim-linux-${arch_tag}.tar.gz"
+
+  info "Trying AppImage (${app}) ..."
+  local app_tmp="/tmp/${app}"
+  if curl -fsSL -o "${app_tmp}" "${base}/${app}"; then
+    chmod +x "${app_tmp}"
+    # Extract (works without FUSE)
+    "${app_tmp}" --appimage-extract >/dev/null
+    mv -f squashfs-root/usr/bin/nvim "${HOME_DIR}/.local/bin/nvim"
+    rm -rf squashfs-root "${app_tmp}"
+    ok "Installed Neovim AppImage to ~/.local/bin/nvim"
+  else
+    warn "AppImage not available (HTTP error). Falling back to tarball (${tar})..."
+    local tar_tmp="/tmp/${tar}"
+    if curl -fsSL -o "${tar_tmp}" "${base}/${tar}"; then
+      # Extract tarball into ~/.local and link to ~/.local/bin/nvim
+      (cd "${HOME_DIR}/.local" && tar -xzf "${tar_tmp}")
+      ln -sf "${HOME_DIR}/.local/nvim-linux-${arch_tag}/bin/nvim" "${HOME_DIR}/.local/bin/nvim"
+      rm -f "${tar_tmp}"
+      ok "Installed Neovim tarball and symlinked ~/.local/bin/nvim"
+    else
+      error "Failed to download both AppImage and tarball. Check network/proxy."
+      return 1
+    fi
+  fi
+
   case ":$PATH:" in
     *":${HOME_DIR}/.local/bin:"*) :;;
     *) warn "Add ~/.local/bin to PATH in your shell rc.";;
