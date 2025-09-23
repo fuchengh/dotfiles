@@ -1,0 +1,52 @@
+# General Settings
+auto-update = download
+theme = NightOwlDark
+clipboard-paste-protection = false
+
+# Macos Settings
+macos-titlebar-style = transparent
+macos-icon = xray
+
+# Font settings
+font-thicken = true
+font-thicken-strength = 20
+font-size = 16
+font-family = Maple Mono Normal NF CN
+window-title-font-family = SFMono Nerd Font
+
+# Cursor settings
+cursor-style = block
+cursor-style-blink = true
+shell-integration-features = no-cursor
+cursor-opacity = 0.9
+cursor-click-to-move = true
+
+# Window settings
+# initial size(row,col)
+window-height = 32
+window-width = 133
+# background
+background-opacity = 0.95
+background-blur = true
+# tab bar titles
+window-subtitle = working-directory
+# paddings
+window-padding-balance = true
+window-padding-x = 20,20
+window-padding-y = 15,15
+# default new windows
+window-inherit-working-directory = false
+
+# ======== keybindings fix for mac =========
+# next/prev tab
+keybind = performable:ctrl+page_down=next_tab
+keybind = performable:ctrl+page_up=previous_tab
+# move tab
+keybind = performable:ctrl+shift+page_up=move_tab:-1
+keybind = performable:ctrl+shift+page_down=move_tab:1
+# shift-insert for mac
+keybind = shift+insert=paste_from_clipboard
+# shift-enter for mac
+keybind = shift+enter=text:\x1b\r
+# ignore ctrl-enter
+keybind = ctrl+enter=ignore
