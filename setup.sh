@@ -61,12 +61,16 @@ ensure_local_bin_in_path() {
   local line='export PATH="$HOME/.local/bin:$PATH"'
   for rc in "${HOME_DIR}/.zshrc" "${HOME_DIR}/.bashrc"; do
     [[ -f "$rc" ]] || continue
-    grep -qE '(^|\s)export PATH="\$HOME/\.local/bin:\$PATH"' "$rc" || {
-      backup_once "${HOME_DIR}/.zshrc"
+    # Use [:space:] (grep -E doesn't understand \s)
+    if ! grep -qE '(^|[[:space:]])export PATH="\$HOME/\.local/bin:\$PATH"' "$rc"; then
+      backup_once "$rc"
       echo "$line" >> "$rc"
       ok "Added ~/.local/bin to PATH in $(basename "$rc")"
-    }
+    else
+      ok "~/.local/bin already in $(basename "$rc")"
+    fi
   done
+  # Ensure current session has it too
   case ":$PATH:" in *":${HOME_DIR}/.local/bin:"*) :;; *) export PATH="${HOME_DIR}/.local/bin:$PATH";; esac
 }
 
@@ -457,6 +461,7 @@ main() {
   install_p10k
   setup_editors
   deploy_shell_configs
+  ensure_local_bin_in_path
   set_default_shell_zsh
   ok "All done. Re-login or 'exec zsh' to apply."
   echo "Tip: run 'p10k configure' anytime to tweak the prompt."
