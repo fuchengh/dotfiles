@@ -106,7 +106,7 @@ install_base_tools_linux() {
   sudo apt-get -qq install -y \
     git curl wget fzf software-properties-common ca-certificates \
     python3-dev python3-pip python3-setuptools \
-    zsh vim neovim bat ripgrep rsync unzip gawk fontconfig \
+    zsh vim bat ripgrep rsync unzip gawk fontconfig \
     build-essential fd-find zoxide || true
   sudo apt-get -qq autoremove -y
 
