@@ -88,7 +88,7 @@ confirm() {
 }
 
 ask_menu() {
-  echo "=== Select tasks === (y/N default: N)"
+  echo "Select tasks (y/N default: N)"
   if confirm "Install Nerd Fonts?" N; then
     DO_FONTS=1
   else
@@ -127,7 +127,7 @@ install_base_tools_linux() {
   sudo apt-get -qq install -y git curl fzf software-properties-common
   sudo apt-get -qq install -y python3-dev python3-pip python3-setuptools
   # 'bat' on Ubuntu is often 'batcat'; still install for new releases
-  sudo apt-get -qq install -y zsh vim neovim bat || true
+  sudo apt-get -qq install -y zsh vim neovim bat ripgrep || true
   sudo apt-get -qq autoremove -y
   # create bat shim if needed
   if command -v batcat >/dev/null 2>&1 && ! command -v bat >/dev/null 2>&1; then
@@ -148,7 +148,7 @@ install_base_tools_macos() {
   fi
   info "Installing base packages via Homebrew..."
   brew update >/dev/null
-  brew install git curl fzf python zsh neovim bat >/dev/null || true
+  brew install git curl fzf python zsh neovim bat ripgrep >/dev/null || true
   # install fzf key-bindings and completion
   if [[ -x "$(brew --prefix)/opt/fzf/install" ]]; then
     yes | "$(brew --prefix)/opt/fzf/install" --no-bash --no-fish --key-bindings --completion >/dev/null || true
@@ -184,6 +184,9 @@ install_fonts_macos() {
     font-roboto-mono-nerd-font
     font-hack-nerd-font
     font-caskaydia-cove-nerd-font
+    font-maple-mono
+    font-maple-mono-nf
+    font-maple-mono-nf-cn
   )
   for c in "${casks[@]}"; do
     if brew list --cask "$c" >/dev/null 2>&1; then
@@ -234,7 +237,7 @@ ensure_oh_my_zsh() {
     ok "Oh My Zsh already installed."
     return
   fi
-  info "Installing Oh My Zsh (unattended)..."
+  info "Installing Oh My Zsh..."
   RUNZSH=no CHSH=no KEEP_ZSHRC=yes \
   sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended || true
 }
