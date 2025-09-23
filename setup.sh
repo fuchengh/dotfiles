@@ -12,14 +12,14 @@ ZSH_PLUGIN_BASE="${ZSH_CUSTOM_DIR}/plugins"
 ZSH_THEME_BASE="${ZSH_CUSTOM_DIR}/themes"
 FONT_BASE="https://github.com/ryanoasis/nerd-fonts/raw/master/patched-fonts"
 
-# Menu defaults (toggle here if you want non-interactive defaults)
+# Menu defaults
 DO_FONTS=0
 DO_NVIM=1
 DO_P10K=1
 DO_ZSH_DEFAULT=1
 DO_ZSH_PLUGINS=1
 
-# Required zsh plugins list
+# Zsh plugins to ensure
 ZSH_PLUGINS=(
   "zsh-users/zsh-history-substring-search"
   "zsh-users/zsh-autosuggestions"
@@ -28,7 +28,7 @@ ZSH_PLUGINS=(
   "Aloxaf/fzf-tab"
 )
 
-# Nerd fonts to fetch when on Linux (curl path style)
+# Nerd fonts for Linux (direct URLs)
 NERD_FONTS_LINUX=(
   "RobotoMono/Regular/RobotoMonoNerdFont-Regular.ttf"
   "RobotoMono/Regular/RobotoMonoNerdFontMono-Regular.ttf"
@@ -39,12 +39,12 @@ NERD_FONTS_LINUX=(
   "Hack/Bold/HackNerdFont-Bold.ttf"
   "Hack/Bold/HackNerdFontMono-Bold.ttf"
   "Hack/Bold/HackNerdFontPropo-Bold.ttf"
-  "CascadiaCode/Regular/CaskaydiaCoveNerdFont-Regular.ttf"
-  "CascadiaCode/Regular/CaskaydiaCoveNerdFontMono-Regular.ttf"
-  "CascadiaCode/Regular/CaskaydiaCoveNerdFontPropo-Regular.ttf"
-  "CascadiaCode/Bold/CaskaydiaCoveNerdFont-Bold.ttf"
-  "CascadiaCode/Bold/CaskaydiaCoveNerdFontMono-Bold.ttf"
-  "CascadiaCode/Bold/CaskaydiaCoveNerdFontPropo-Bold.ttf"
+  "CascadiaCode/CaskaydiaCoveNerdFont-Regular.ttf"
+  "CascadiaCode/CaskaydiaCoveNerdFontMono-Regular.ttf"
+  "CascadiaCode/CaskaydiaCoveNerdFontPropo-Regular.ttf"
+  "CascadiaCode/CaskaydiaCoveNerdFont-Bold.ttf"
+  "CascadiaCode/CaskaydiaCoveNerdFontMono-Bold.ttf"
+  "CascadiaCode/CaskaydiaCoveNerdFontPropo-Bold.ttf"
 )
 
 info()  { printf "\033[1;34m[INFO]\033[0m %s\n" "$*"; }
@@ -55,89 +55,64 @@ ok()    { printf "\033[1;32m[ OK ]\033[0m %s\n" "$*"; }
 is_macos()  { [[ "$(uname -s)" == "Darwin" ]]; }
 is_linux()  { [[ "$(uname -s)" == "Linux"  ]]; }
 
-need_cmd() {
-  command -v "$1" >/dev/null 2>&1 || { warn "Missing command: $1"; return 1; }
-}
-
+need_cmd() { command -v "$1" >/dev/null 2>&1 || { warn "Missing command: $1"; return 1; }; }
 ensure_dir() { mkdir -p "$1"; }
 
-# ---------- Detect package managers ----------
-have_brew=0
-have_apt=0
+# ---------- Package manager detection ----------
+have_brew=0; have_apt=0
 if is_macos && command -v brew >/dev/null 2>&1; then have_brew=1; fi
 if is_linux && command -v apt-get >/dev/null 2>&1; then have_apt=1; fi
 
-# ---------- Menu ----------
+# ---------- Menu (Bash 3/4 safe) ----------
 confirm() {
-  # $1: question, $2: default Y or N
-  # returns 0 for yes, 1 for no
   local q="$1" d="${2:-N}" ans prompt
-  case "$d" in
-    Y|y) prompt="Y/n" ;;
-    *)   prompt="y/N" ;;
-  esac
+  case "$d" in Y|y) prompt="Y/n";; *) prompt="y/N";; esac
   read -r -p "$q [$prompt]: " ans
-  # empty -> default
-  if [ -z "$ans" ]; then
-    ans="$d"
-  fi
-  case "$ans" in
-    y|Y|yes|YES) return 0 ;;
-    *)           return 1 ;;
-  esac
+  [[ -z "$ans" ]] && ans="$d"
+  case "$ans" in y|Y|yes|YES) return 0;; *) return 1;; esac
 }
 
 ask_menu() {
   echo "Select tasks (y/N default: N)"
-  if confirm "Install Nerd Fonts?" N; then
-    DO_FONTS=1
-  else
-    DO_FONTS=0
-  fi
+  confirm "Install Nerd Fonts?" N && DO_FONTS=1 || DO_FONTS=0
+  confirm "Install Neovim (plus Vim configs/plugins)?" Y && DO_NVIM=1 || DO_NVIM=0
+  confirm "Deploy Powerlevel10k (theme + ~/.p10k.zsh)?" Y && DO_P10K=1 || DO_P10K=0
+  confirm "Set default shell to zsh?" Y && DO_ZSH_DEFAULT=1 || DO_ZSH_DEFAULT=0
+  confirm "Install/verify zsh plugins (git clone)?" Y && DO_ZSH_PLUGINS=1 || DO_ZSH_PLUGINS=0
+}
 
-  if confirm "Install Neovim (plus Vim configs/plugins)?" N; then
-    DO_NVIM=1
+# ---------- Version helpers ----------
+nvim_version_minor() {
+  if command -v nvim >/dev/null 2>&1; then
+    nvim --version | awk 'NR==1{match($0,/NVIM v([0-9]+)\.([0-9]+)/,a); if(a[2]!=""){print a[2]} else {print 0}}'
   else
-    DO_NVIM=0
-  fi
-
-  if confirm "Deploy Powerlevel10k (theme + ~/.p10k.zsh)?" Y; then
-    DO_P10K=1
-  else
-    DO_P10K=0
-  fi
-
-  if confirm "Set default shell to zsh?" Y; then
-    DO_ZSH_DEFAULT=1
-  else
-    DO_ZSH_DEFAULT=0
-  fi
-
-  if confirm "Install/verify zsh plugins (git clone)?" Y; then
-    DO_ZSH_PLUGINS=1
-  else
-    DO_ZSH_PLUGINS=0
+    echo 0
   fi
 }
 
-# ---------- OS packages ----------
+# ---------- Base tools ----------
 install_base_tools_linux() {
   info "Installing base packages via apt..."
   sudo apt-get -qq update
-  sudo apt-get -qq install -y git curl fzf software-properties-common
-  sudo apt-get -qq install -y python3-dev python3-pip python3-setuptools
-  # 'bat' on Ubuntu is often 'batcat'; still install for new releases
-  sudo apt-get -qq install -y zsh vim neovim bat ripgrep || true
+  sudo apt-get -qq install -y \
+    git curl wget fzf software-properties-common ca-certificates \
+    python3-dev python3-pip python3-setuptools \
+    zsh vim neovim bat ripgrep rsync unzip gawk fontconfig \
+    build-essential fd-find zoxide || true
   sudo apt-get -qq autoremove -y
-  # create bat shim if needed
+
+  # bat shim (Ubuntu packages often use 'batcat')
   if command -v batcat >/dev/null 2>&1 && ! command -v bat >/dev/null 2>&1; then
     ensure_dir "${HOME_DIR}/.local/bin"
     ln -sf "$(command -v batcat)" "${HOME_DIR}/.local/bin/bat"
     ok "Created ~/.local/bin/bat -> batcat"
-    case ":$PATH:" in
-      *":${HOME_DIR}/.local/bin:"*) :;;
-      *) warn "Add ~/.local/bin to PATH in your shell rc."; ;;
-    esac
+    case ":$PATH:" in *":${HOME_DIR}/.local/bin:"*) :;; *) warn "Add ~/.local/bin to PATH in your shell rc.";; esac
+  fi
+  # fd shim (Ubuntu uses 'fdfind')
+  if command -v fdfind >/dev/null 2>&1 && ! command -v fd >/dev/null 2>&1; then
+    ensure_dir "${HOME_DIR}/.local/bin"
+    ln -sf "$(command -v fdfind)" "${HOME_DIR}/.local/bin/fd"
+    ok "Created ~/.local/bin/fd -> fdfind"
   fi
 }
 
@@ -148,10 +123,21 @@ install_base_tools_macos() {
   fi
   info "Installing base packages via Homebrew..."
   brew update >/dev/null
-  brew install git curl fzf python zsh neovim bat ripgrep >/dev/null || true
-  # install fzf key-bindings and completion
+  brew install git curl fzf python zsh neovim bat ripgrep fd zoxide gawk rsync >/dev/null || true
+
+  # fzf key-bindings/completion
   if [[ -x "$(brew --prefix)/opt/fzf/install" ]]; then
     yes | "$(brew --prefix)/opt/fzf/install" --no-bash --no-fish --key-bindings --completion >/dev/null || true
+  fi
+
+  # clangd via LLVM, and add to PATH if needed
+  brew install llvm >/dev/null || true
+  local llvm_bin; llvm_bin="$(brew --prefix llvm)/bin"
+  if [[ -x "$llvm_bin/clangd" ]]; then
+    if ! grep -qs "$llvm_bin" "${HOME_DIR}/.zshrc"; then
+      echo 'export PATH="'"$llvm_bin"':$PATH"' >> "${HOME_DIR}/.zshrc"
+      ok "Added LLVM bin to PATH in ~/.zshrc (for clangd)"
+    fi
   fi
 }
 
@@ -184,6 +170,7 @@ install_fonts_macos() {
     font-roboto-mono-nerd-font
     font-hack-nerd-font
     font-caskaydia-cove-nerd-font
+    font-caskaydia-mono-nerd-font
     font-maple-mono
     font-maple-mono-nf
     font-maple-mono-nf-cn
@@ -244,12 +231,8 @@ ensure_oh_my_zsh() {
 
 # ---------- Zsh plugins ----------
 ensure_zsh_plugin_repo() {
-  local repo="$1"                # e.g. zsh-users/zsh-autosuggestions
-  local name="${repo##*/}"       # e.g. zsh-autosuggestions
-  local dest="${ZSH_PLUGIN_BASE}/${name}"
-  if [[ -d "${dest}" ]]; then
-    ok "zsh plugin ${name} present."
-  else
+  local repo="$1"; local name="${repo##*/}"; local dest="${ZSH_PLUGIN_BASE}/${name}"
+  if [[ -d "${dest}" ]]; then ok "zsh plugin ${name} present."; else
     info "Cloning ${repo} -> ${dest}"
     ensure_dir "${ZSH_PLUGIN_BASE}"
     git clone --depth=1 "https://github.com/${repo}.git" "${dest}"
@@ -259,9 +242,7 @@ ensure_zsh_plugin_repo() {
 install_zsh_plugins() {
   [[ $DO_ZSH_PLUGINS -eq 1 ]] || return 0
   ensure_oh_my_zsh
-  for r in "${ZSH_PLUGINS[@]}"; do
-    ensure_zsh_plugin_repo "$r"
-  done
+  for r in "${ZSH_PLUGINS[@]}"; do ensure_zsh_plugin_repo "$r"; done
 }
 
 # ---------- Powerlevel10k ----------
@@ -269,108 +250,90 @@ install_p10k() {
   [[ $DO_P10K -eq 1 ]] || return 0
   ensure_oh_my_zsh
   local dest="${ZSH_THEME_BASE}/powerlevel10k"
-  if [[ -d "${dest}" ]]; then
-    ok "Powerlevel10k already present."
-  else
-    info "Cloning Powerlevel10k..."
-    ensure_dir "${ZSH_THEME_BASE}"
+  if [[ -d "${dest}" ]]; then ok "Powerlevel10k already present."; else
+    info "Cloning Powerlevel10k..."; ensure_dir "${ZSH_THEME_BASE}"
     git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "${dest}"
   fi
   if [[ -f "${REPO_DIR}/.p10k.zsh" ]]; then
-    cp -f "${REPO_DIR}/.p10k.zsh" "${HOME_DIR}/.p10k.zsh"
-    ok "Deployed ~/.p10k.zsh"
+    cp -f "${REPO_DIR}/.p10k.zsh" "${HOME_DIR}/.p10k.zsh"; ok "Deployed ~/.p10k.zsh"
   else
-    warn "No .p10k.zsh in repo; you can run 'p10k configure' later."
+    warn "No .p10k.zsh in repo; run 'p10k configure' later."
   fi
 }
 
-# ---------- Shell default ----------
+# ---------- Default shell ----------
 set_default_shell_zsh() {
   [[ $DO_ZSH_DEFAULT -eq 1 ]] || return 0
-
-  local zsh_path
-  zsh_path="$(command -v zsh || true)"
-  if [[ -z "$zsh_path" ]]; then
-    warn "zsh not installed; skip chsh"
-    return
-  fi
-
+  need_cmd zsh || { warn "zsh not installed; skip chsh"; return; }
+  local zsh_path; zsh_path="$(command -v zsh)"
   if is_macos; then
-    if ! grep -qx "$zsh_path" /etc/shells; then
-      info "Adding $zsh_path to /etc/shells (sudo)..."
-      echo "$zsh_path" | sudo tee -a /etc/shells >/dev/null
-    fi
+    grep -qx "$zsh_path" /etc/shells || { info "Adding $zsh_path to /etc/shells (sudo)..."; echo "$zsh_path" | sudo tee -a /etc/shells >/dev/null; }
   fi
-
-  if [[ "${SHELL:-}" == "$zsh_path" ]]; then
-    ok "Default shell already $zsh_path"
-    return
-  fi
-
+  if [[ "${SHELL:-}" == "$zsh_path" ]]; then ok "Default shell already $zsh_path"; return; fi
   info "Changing default shell to $zsh_path (you may be prompted for your password)..."
-  if chsh -s "$zsh_path" "$USER"; then
-    ok "Default shell changed to $zsh_path"
-  else
-    warn "chsh failed; retrying with sudo..."
-    if sudo chsh -s "$zsh_path" "$USER"; then
-      ok "Default shell changed to $zsh_path (sudo)"
-    else
-      error "Could not change default shell. Check MDM/enterprise restrictions."
-    fi
-  fi
+  chsh -s "$zsh_path" "$USER" || { warn "chsh failed; retrying with sudo..."; sudo chsh -s "$zsh_path" "$USER" || error "Could not change default shell. Check restrictions."; }
 }
 
-# ---------- Editors: Vim/Neovim + plugins ----------
+# ---------- Editor configs ----------
 deploy_editor_configs() {
-  # Copy dotfiles from repo if present
-  [[ -f "${REPO_DIR}/.vimrc"     ]] && cp -f "${REPO_DIR}/.vimrc"     "${HOME_DIR}/.vimrc"
-  [[ -f "${REPO_DIR}/.clang-format" ]] && cp -f "${REPO_DIR}/.clang-format" "${HOME_DIR}/.clang-format"
-  [[ -f "${REPO_DIR}/.zshrc"     ]] && cp -f "${REPO_DIR}/.zshrc"     "${HOME_DIR}/.zshrc"
-  # nvim config directory
+  [[ -f "${REPO_DIR}/.vimrc"          ]] && cp -f "${REPO_DIR}/.vimrc"          "${HOME_DIR}/.vimrc"
+  [[ -f "${REPO_DIR}/.clang-format"   ]] && cp -f "${REPO_DIR}/.clang-format"   "${HOME_DIR}/.clang-format"
+  [[ -f "${REPO_DIR}/.zshrc"          ]] && cp -f "${REPO_DIR}/.zshrc"          "${HOME_DIR}/.zshrc"
   if [[ -d "${REPO_DIR}/.config/nvim" ]]; then
     ensure_dir "${HOME_DIR}/.config"
-    # copy (not symlink) to avoid permission surprises on some hosts
     rsync -a --delete "${REPO_DIR}/.config/nvim/" "${HOME_DIR}/.config/nvim/"
   fi
 }
 
 install_vim_plug() {
-  # vim
-  curl -fsSLo "${HOME_DIR}/.vim/autoload/plug.vim" --create-dirs \
-    https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
-  # nvim
-  curl -fsSLo "${HOME_DIR}/.local/share/nvim/site/autoload/plug.vim" --create-dirs \
-    https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+  curl -fsSLo "${HOME_DIR}/.vim/autoload/plug.vim"           --create-dirs https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+  curl -fsSLo "${HOME_DIR}/.local/share/nvim/site/autoload/plug.vim" --create-dirs https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
 }
 
 install_editor_plugins() {
-  # Vim plugins
-  if command -v vim >/dev/null 2>&1; then
-    info "Installing Vim plugins via vim-plug..."
-    vim +PlugInstall +qall || true
-  fi
-  # Neovim plugins
+  if command -v vim  >/dev/null 2>&1; then info "Installing Vim plugins via vim-plug...";  vim +PlugInstall +qall || true; fi
   if command -v nvim >/dev/null 2>&1; then
     info "Installing Neovim plugins via vim-plug..."
-    nvim --headless "+PlugInstall --sync" +qa || true
+    nvim --headless "+PlugInstall --sync" "+TSUpdate" +qa || true
   fi
   info "Editor plugins installation done."
 }
 
-install_neovim_linux() {
-  # Already installed in base, but keep guard
+# ---------- Neovim (latest) ----------
+install_neovim_linux_latest() {
+  # Try official stable PPA first
+  info "Ensuring Neovim >= 0.11 on Linux..."
   sudo apt-get -qq update
-  sudo apt-get -qq install -y neovim
+  sudo add-apt-repository -y ppa:neovim-ppa/stable || true
+  sudo apt-get -qq update
+  sudo apt-get -qq install -y neovim || true
+
+  local minor; minor="$(nvim_version_minor || echo 0)"
+  if [[ "${minor:-0}" -lt 11 ]]; then
+    warn "Neovim is still < 0.11 (minor=${minor:-0}); falling back to AppImage."
+    ensure_dir "${HOME_DIR}/.local/bin"
+    local appimg="/tmp/nvim.appimage"
+    curl -fsSL -o "${appimg}" "https://github.com/neovim/neovim/releases/latest/download/nvim.appimage"
+    chmod +x "${appimg}"
+    "${appimg}" --appimage-extract >/dev/null
+    mv -f squashfs-root/usr/bin/nvim "${HOME_DIR}/.local/bin/nvim"
+    rm -rf squashfs-root "${appimg}"
+    ok "Installed Neovim AppImage to ~/.local/bin/nvim"
+    case ":$PATH:" in *":${HOME_DIR}/.local/bin:"*) :;; *) warn "Add ~/.local/bin to PATH in your shell rc.";; esac
+  else
+    ok "Neovim $(nvim --version | head -1) OK"
+  fi
 }
 
 install_neovim_macos() {
   [[ $have_brew -eq 1 ]] || { warn "brew missing; skip Neovim"; return; }
   brew install neovim >/dev/null || true
+  ok "Neovim $(nvim --version | head -1)"
 }
 
 setup_editors() {
   [[ $DO_NVIM -eq 1 ]] || return 0
-  if is_linux; then install_neovim_linux; fi
+  if is_linux; then install_neovim_linux_latest; fi
   if is_macos; then install_neovim_macos; fi
   deploy_editor_configs
   install_vim_plug
@@ -379,16 +342,14 @@ setup_editors() {
 
 # ---------- Zsh rc + ownership ----------
 deploy_shell_configs() {
-  # Preserve old files
   for f in .zshrc .vimrc; do
     if [[ -f "${HOME_DIR}/${f}" && ! -f "${HOME_DIR}/${f}.orig" ]]; then
       cp "${HOME_DIR}/${f}" "${HOME_DIR}/${f}.orig" || true
       ok "Backup ${f} -> ${f}.orig"
     fi
   done
-  # Copy from repo (if present)
-  [[ -f "${REPO_DIR}/.zshrc" ]] && cp -f "${REPO_DIR}/.zshrc" "${HOME_DIR}/.zshrc"
-  [[ -f "${REPO_DIR}/.p10k.zsh" ]] && cp -f "${REPO_DIR}/.p10k.zsh" "${HOME_DIR}/.p10k.zsh"
+  [[ -f "${REPO_DIR}/.zshrc"     ]] && cp -f "${REPO_DIR}/.zshrc"     "${HOME_DIR}/.zshrc"
+  [[ -f "${REPO_DIR}/.p10k.zsh"  ]] && cp -f "${REPO_DIR}/.p10k.zsh"  "${HOME_DIR}/.p10k.zsh"
   [[ -d "${HOME_DIR}/.oh-my-zsh" ]] && chown -R "$USER":"$(id -gn)" "${HOME_DIR}/.oh-my-zsh" || true
 }
 
