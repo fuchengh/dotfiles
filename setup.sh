@@ -57,6 +57,55 @@ is_linux()  { [[ "$(uname -s)" == "Linux"  ]]; }
 
 need_cmd() { command -v "$1" >/dev/null 2>&1 || { warn "Missing command: $1"; return 1; }; }
 ensure_dir() { mkdir -p "$1"; }
+ensure_local_bin_in_path() {
+  local line='export PATH="$HOME/.local/bin:$PATH"'
+  for rc in "${HOME_DIR}/.zshrc" "${HOME_DIR}/.bashrc"; do
+    [[ -f "$rc" ]] || continue
+    grep -qE '(^|\s)export PATH="\$HOME/\.local/bin:\$PATH"' "$rc" || {
+      backup_once "${HOME_DIR}/.zshrc"
+      echo "$line" >> "$rc"
+      ok "Added ~/.local/bin to PATH in $(basename "$rc")"
+    }
+  done
+  case ":$PATH:" in *":${HOME_DIR}/.local/bin:"*) :;; *) export PATH="${HOME_DIR}/.local/bin:$PATH";; esac
+}
+
+# --- helpers (put near the top, after ensure_dir) ---
+backup_once() {
+  # Backup a file only if it exists and no .orig yet
+  local dst="$1"
+  if [[ -f "$dst" && ! -f "${dst}.orig" ]]; then
+    cp -f "$dst" "${dst}.orig"
+    ok "Backup $(basename "$dst") -> $(basename "$dst").orig"
+  fi
+}
+
+install_file() {
+  # Copy file only if changed; create one-time backup first
+  local src="$1" dst="$2"
+  [[ -f "$src" ]] || { warn "Missing source: $src"; return 0; }
+  backup_once "$dst"
+  if [[ -f "$dst" ]] && cmp -s "$src" "$dst"; then
+    ok "Unchanged $(basename "$dst")"
+  else
+    ensure_dir "$(dirname "$dst")"
+    cp -f "$src" "$dst"
+    ok "Deployed $(basename "$dst")"
+  fi
+}
+
+install_tree() {
+  # rsync a directory tree; keep a one-time backup of existing dst
+  local src="$1" dst="$2"
+  [[ -d "$src" ]] || { warn "Missing dir: $src"; return 0; }
+  if [[ -d "$dst" && ! -d "${dst}.orig" ]]; then
+    mv "$dst" "${dst}.orig"
+    ok "Backup $(basename "$dst")/ -> $(basename "$dst").orig/"
+  fi
+  ensure_dir "$dst"
+  rsync -a --delete "${src}/" "${dst}/"
+  ok "Synced $(basename "$dst")/"
+}
 
 # ---------- Package manager detection ----------
 have_brew=0; have_apt=0
@@ -143,6 +192,7 @@ install_base_tools_macos() {
   local llvm_bin; llvm_bin="$(brew --prefix llvm)/bin"
   if [[ -x "$llvm_bin/clangd" ]]; then
     if ! grep -qs "$llvm_bin" "${HOME_DIR}/.zshrc"; then
+      backup_once "${HOME_DIR}/.zshrc"
       echo 'export PATH="'"$llvm_bin"':$PATH"' >> "${HOME_DIR}/.zshrc"
       ok "Added LLVM bin to PATH in ~/.zshrc (for clangd)"
     fi
@@ -247,12 +297,11 @@ set_default_shell_zsh() {
 
 # ---------- Editor configs ----------
 deploy_editor_configs() {
-  [[ -f "${REPO_DIR}/.vimrc"        ]] && cp -f "${REPO_DIR}/.vimrc"        "${HOME_DIR}/.vimrc"
-  [[ -f "${REPO_DIR}/.clang-format" ]] && cp -f "${REPO_DIR}/.clang-format" "${HOME_DIR}/.clang-format"
-  [[ -f "${REPO_DIR}/.zshrc"        ]] && cp -f "${REPO_DIR}/.zshrc"        "${HOME_DIR}/.zshrc"
+  install_file "${REPO_DIR}/.vimrc"        "${HOME_DIR}/.vimrc"
+  install_file "${REPO_DIR}/.clang-format" "${HOME_DIR}/.clang-format"
+
   if [[ -d "${REPO_DIR}/.config/nvim" ]]; then
-    ensure_dir "${HOME_DIR}/.config"
-    rsync -a --delete "${REPO_DIR}/.config/nvim/" "${HOME_DIR}/.config/nvim/"
+    install_tree "${REPO_DIR}/.config/nvim" "${HOME_DIR}/.config/nvim"
   fi
 }
 install_vim_plug() {
@@ -333,14 +382,31 @@ install_neovim_linux_latest() {
     auto|*)   install_neovim_tarball || { warn "Tarball failed; trying AppImage..."; install_neovim_appimage || { warn "AppImage failed; trying PPA..."; install_neovim_ppa_with_timeout || error "All Neovim install methods failed."; }; } ;;
   esac
 
-  # Verify version & runtime
+  # Verify we are using the right binary and version
+  ensure_local_bin_in_path
   local NVBIN; NVBIN="$(nvim_bin_path)"
   if [[ -z "$NVBIN" ]]; then error "nvim not found in PATH after install"; return 1; fi
   local minor; minor="$(nvim_version_minor "$NVBIN")"
   if [[ "$minor" -lt 11 ]]; then warn "Neovim still < 0.11 (minor=$minor)."; fi
-  local vr; vr="$("$NVBIN" --headless -u NONE +"echo \$VIMRUNTIME" +qa 2>/dev/null || true)"
-  if [[ -z "$vr" || ! -d "$vr" ]]; then error "VIMRUNTIME not found (got '$vr'). Runtime is broken."; return 1; fi
-  ok "Neovim OK. VIMRUNTIME=$vr"
+
+  # Locate runtime by filesystem (handles tarball & AppImage)
+  local runtime=""
+  # tarball layout: ~/.local/opt/nvim-linux-*/share/nvim/runtime
+  for d in "${HOME_DIR}/.local/opt"/nvim-linux-*; do
+    [[ -d "$d/share/nvim/runtime" ]] && runtime="$d/share/nvim/runtime"
+  done
+  # AppImage layout: ~/.local/opt/nvim-appimage-*/squashfs-root/usr/share/nvim/runtime
+  if [[ -z "$runtime" ]]; then
+    for d in "${HOME_DIR}/.local/opt"/nvim-appimage-*; do
+      [[ -d "$d/squashfs-root/usr/share/nvim/runtime" ]] && runtime="$d/squashfs-root/usr/share/nvim/runtime"
+    done
+  fi
+
+  if [[ -z "$runtime" || ! -f "$runtime/syntax/syntax.vim" ]]; then
+    error "Neovim runtime not found under ~/.local/opt (broken install)."
+    return 1
+  fi
+  ok "Neovim OK. Runtime at: $runtime"
 }
 install_neovim_macos() {
   [[ $have_brew -eq 1 ]] || { warn "brew missing; skip Neovim"; return; }
@@ -374,14 +440,9 @@ setup_editors() {
 
 # ---------- Zsh rc + ownership ----------
 deploy_shell_configs() {
-  for f in .zshrc .vimrc; do
-    if [[ -f "${HOME_DIR}/${f}" && ! -f "${HOME_DIR}/${f}.orig" ]]; then
-      cp "${HOME_DIR}/${f}" "${HOME_DIR}/${f}.orig" || true
-      ok "Backup ${f} -> ${f}.orig"
-    fi
-  done
-  [[ -f "${REPO_DIR}/.zshrc"     ]] && cp -f "${REPO_DIR}/.zshrc"     "${HOME_DIR}/.zshrc"
-  [[ -f "${REPO_DIR}/.p10k.zsh"  ]] && cp -f "${REPO_DIR}/.p10k.zsh"  "${HOME_DIR}/.p10k.zsh"
+  # Shell-related only; backup-before-first-overwrite semantics
+  install_file "${REPO_DIR}/.zshrc"    "${HOME_DIR}/.zshrc"
+  install_file "${REPO_DIR}/.p10k.zsh" "${HOME_DIR}/.p10k.zsh"
   [[ -d "${HOME_DIR}/.oh-my-zsh" ]] && chown -R "$USER":"$(id -gn)" "${HOME_DIR}/.oh-my-zsh" || true
 }
 
@@ -390,6 +451,7 @@ main() {
   info "Start setup"
   ask_menu
   install_base_tools
+  ensure_local_bin_in_path
   install_fonts
   install_zsh_plugins
   install_p10k
