@@ -354,6 +354,7 @@ install_editor_plugins() {
     info "Installing Neovim plugins via vim-plug..."
     nvim --headless "+PlugInstall --sync" +qa || true
   fi
+  info "Editor plugins installation done."
 }
 
 install_neovim_linux() {
