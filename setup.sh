@@ -301,28 +301,74 @@ install_editor_plugins() {
 
 # ---------- Neovim (latest) ----------
 install_neovim_linux_latest() {
-  # Try official stable PPA first
   info "Ensuring Neovim >= 0.11 on Linux..."
-  sudo apt-get -qq update
-  sudo add-apt-repository -y ppa:neovim-ppa/stable || true
-  sudo apt-get -qq update
-  sudo apt-get -qq install -y neovim || true
 
+  # Allow override: NVIM_LINUX_INSTALL=appimage|ppa|auto (default auto)
+  local mode="${NVIM_LINUX_INSTALL:-auto}"
+
+  # If user forces appimage, skip PPA entirely
+  if [[ "$mode" == "appimage" ]]; then
+    install_neovim_appimage
+    return
+  fi
+
+  # Only try PPA on Ubuntu AND add-apt-repository exists
+  if grep -qi 'ubuntu' /etc/os-release && command -v add-apt-repository >/dev/null 2>&1; then
+    info "Trying Ubuntu PPA (neovim-ppa/stable)..."
+    sudo apt-get -qq update
+    sudo apt-get -qq install -y software-properties-common ca-certificates || true
+
+    local add_ok=0
+    if command -v timeout >/dev/null 2>&1; then
+      # Guard against hangs (25s)
+      if sudo timeout 25s add-apt-repository -y ppa:neovim-ppa/stable; then
+        add_ok=1
+      fi
+    else
+      if sudo add-apt-repository -y ppa:neovim-ppa/stable; then
+        add_ok=1
+      fi
+    fi
+
+    if [[ $add_ok -eq 1 ]]; then
+      sudo apt-get -qq update
+      sudo apt-get -qq install -y neovim || true
+    else
+      warn "PPA add failed or timed out; falling back to AppImage."
+      install_neovim_appimage
+      return
+    fi
+  else
+    warn "Non-Ubuntu or add-apt-repository missing; using AppImage."
+    install_neovim_appimage
+    return
+  fi
+
+  # Verify version; fallback if still too old
   local minor; minor="$(nvim_version_minor || echo 0)"
   if [[ "${minor:-0}" -lt 11 ]]; then
-    warn "Neovim is still < 0.11 (minor=${minor:-0}); falling back to AppImage."
-    ensure_dir "${HOME_DIR}/.local/bin"
-    local appimg="/tmp/nvim.appimage"
-    curl -fsSL -o "${appimg}" "https://github.com/neovim/neovim/releases/latest/download/nvim.appimage"
-    chmod +x "${appimg}"
-    "${appimg}" --appimage-extract >/dev/null
-    mv -f squashfs-root/usr/bin/nvim "${HOME_DIR}/.local/bin/nvim"
-    rm -rf squashfs-root "${appimg}"
-    ok "Installed Neovim AppImage to ~/.local/bin/nvim"
-    case ":$PATH:" in *":${HOME_DIR}/.local/bin:"*) :;; *) warn "Add ~/.local/bin to PATH in your shell rc.";; esac
+    warn "Neovim still < 0.11; switching to AppImage."
+    install_neovim_appimage
   else
     ok "Neovim $(nvim --version | head -1) OK"
   fi
+}
+
+install_neovim_appimage() {
+  ensure_dir "${HOME_DIR}/.local/bin"
+  local appimg="/tmp/nvim.appimage"
+  info "Installing Neovim via AppImage to ~/.local/bin/nvim"
+  curl -fsSL -o "${appimg}" "https://github.com/neovim/neovim/releases/latest/download/nvim.appimage"
+  chmod +x "${appimg}"
+  # No FUSE needed; extract and move the real binary
+  "${appimg}" --appimage-extract >/dev/null
+  mv -f squashfs-root/usr/bin/nvim "${HOME_DIR}/.local/bin/nvim"
+  rm -rf squashfs-root "${appimg}"
+  ok "Installed Neovim AppImage to ~/.local/bin/nvim"
+  case ":$PATH:" in
+    *":${HOME_DIR}/.local/bin:"*) :;;
+    *) warn "Add ~/.local/bin to PATH in your shell rc.";;
+  esac
 }
 
 install_neovim_macos() {

@@ -80,7 +80,7 @@ nnoremap <C-s> :w<CR>
 inoremap <C-s> <Esc>:w<CR>
 vnoremap <C-s> <C-c>:w<CR>
 nnoremap <C-p> :Telescope find_files<CR>
-nnoremap <C-f> :Telescope live_grep<CR>   " needs rg
+nnoremap <C-f> :Telescope live_grep<CR>
 nnoremap <leader>fb :Telescope buffers<CR>
 nnoremap <leader>P  :Telescope commands<CR>
 nnoremap <C-b> :NvimTreeToggle<CR>
