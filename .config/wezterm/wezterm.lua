@@ -1,58 +1,11 @@
 local wezterm = require('wezterm')
 local utils = require('utils')
-
 local config = wezterm.config_builder()
+local act = wezterm.action
 
 local scheme = 'Night Owl (Gogh)'
-local scheme_def = wezterm.color.get_builtin_schemes()[scheme]
 local primary_font = 'Maple Mono Normal NF CN'
 local secondary_font = 'Liga SFMono Nerd Font'
-local SOLID_LEFT_ARROW = wezterm.nerdfonts.pl_right_hard_divider
-local SOLID_RIGHT_ARROW = wezterm.nerdfonts.pl_left_hard_divider
-
--- Window settings
-config.window_decorations = "INTEGRATED_BUTTONS|RESIZE"
-config.use_fancy_tab_bar = true
-config.tab_bar_at_bottom = false
-config.hide_tab_bar_if_only_one_tab = false
-config.scrollback_lines = 100000
-config.initial_rows = 32
-config.initial_cols = 133
-config.audible_bell = "Disabled"
-config.visual_bell = {
-  fade_in_duration_ms = 75,
-  fade_out_duration_ms = 75,
-  target = 'CursorColor',
-}
-config.colors = {
-  visual_bell = '#202020',
-}
-config.window_frame = {
-    -- Fonts for the tab bar
-    font = wezterm.font {
-        family = primary_font,
-        weight = 'Bold'
-    },
-    font_size = 14
-}
-config.window_padding = {
-    left = "1cell",
-    right = "1cell",
-    top = "2cell",
-    bottom = "0.5cell"
-}
-
--- Color
-config.color_scheme = scheme
--- Background transparency
-config.window_background_opacity = 0.85
-config.macos_window_background_blur = 80
-
--- Cursor settings
-config.max_fps = 144
-config.animation_fps = 144
-config.default_cursor_style = 'BlinkingBlock'
-config.cursor_blink_rate = 700
 
 -- Font settings
 -- Font for the text
@@ -66,8 +19,37 @@ config.font = wezterm.font_with_fallback({{
 config.line_height = 1.1
 config.font_size = 16
 
--- Tab bar settings
+-- Window settings
+config.use_fancy_tab_bar = true
+config.hide_tab_bar_if_only_one_tab = false
 config.tab_bar_at_bottom = true
+config.scrollback_lines = 100000
+config.initial_rows = 32
+config.initial_cols = 133
+config.audible_bell = "Disabled"
+config.visual_bell = {
+    fade_in_duration_ms = 75,
+    fade_out_duration_ms = 75,
+    target = 'CursorColor'
+}
+config.colors = {
+    visual_bell = '#202020'
+}
+config.window_frame = {
+    -- Fonts for the tab bar
+    font = wezterm.font {
+        family = secondary_font,
+        weight = 'Regular'
+    },
+    font_size = 14
+}
+config.window_padding = {
+    left = "1.5cell",
+    right = "1.5cell",
+    top = "2cell",
+    bottom = "1cell"
+}
+-- Tab bar settings
 wezterm.on('format-tab-title', function(tab, tabs, panes, config, hover, max_width)
     local pane = tab.active_pane
     local cwd_uri = pane.current_working_dir
@@ -80,32 +62,49 @@ wezterm.on('format-tab-title', function(tab, tabs, panes, config, hover, max_wid
         directoryName = utils.getDirectoryName(cwd_path)
     end
 
-    local title = string.format(' %s: %s (%s) ', (tab.tab_index + 1), directoryName, process)
+    local title = string.format(' [%s] %s (%s) ', (tab.tab_index + 1), directoryName, process)
 
     return {{
         Text = title
     }}
 end)
-
--- Status bar
-config.status_update_interval = 500
+-- Right status information
+function basename(s)
+    return string.gsub(s, '(.*[/\\])(.*)', '%2')
+end
 wezterm.on('update-right-status', function(window, pane)
-    local hostname = wezterm.hostname()
+    local date = wezterm.strftime('%H:%M ')
+    local process_name = basename(pane:get_foreground_process_name())
 
-    window:set_right_status(wezterm.format({{
-        Foreground = {
-            Color = scheme_def.foreground
-        }
-    }, {
-        Background = {
-            Color = 'none'
-        }
-    }, {
-        Text = wezterm.nerdfonts.oct_person_fill .. " " .. hostname
-    }, {
-        Text = "   "
-    }}))
+    window:set_right_status(
+        wezterm.nerdfonts.fa_terminal .. ' ' .. process_name .. ' ' .. wezterm.nerdfonts.fa_clock_o .. ' ' .. date ..
+            ' ')
 end)
+
+-- Color
+config.color_scheme = scheme
+-- Background transparency
+config.window_background_opacity = 0.9
+config.macos_window_background_blur = 80
+-- Search colors
+config.colors.copy_mode_active_highlight_fg = {
+    AnsiColor = 'Black'
+}
+config.colors.copy_mode_active_highlight_bg = {
+    AnsiColor = 'Lime'
+}
+config.colors.copy_mode_inactive_highlight_fg = {
+    AnsiColor = 'Black'
+}
+config.colors.copy_mode_inactive_highlight_bg = {
+    AnsiColor = 'Green'
+}
+
+-- Cursor settings
+config.max_fps = 60
+config.animation_fps = 60
+config.default_cursor_style = 'BlinkingBlock'
+config.cursor_blink_rate = 700
 
 -- Key bindings
 config.keys = { -- Option-left for backward-word
@@ -132,7 +131,69 @@ config.keys = { -- Option-left for backward-word
     key = "\u{f746}",
     mods = "SHIFT",
     action = wezterm.action.PasteFrom 'Clipboard'
-} -- End of key bindings
+}, { -- Fix cmd+left key for macOS
+    key = "LeftArrow",
+    mods = "CMD",
+    action = wezterm.action {
+        SendString = "\x1bOH"
+    }
+}, { -- Fix cmd+right key for macOS
+    key = "RightArrow",
+    mods = "CMD",
+    action = wezterm.action {
+        SendString = "\x1bOF"
+    }
+},{
+    key = "f",
+    mods = "CMD",
+    action = wezterm.action_callback(function(window, pane)
+        -- window:perform_action(act.Search 'CurrentSelectionOrEmptyString', pane)
+        window:perform_action(act.Search {
+            CaseInSensitiveString = ""
+        }, pane)
+        window:perform_action(act.Multiple {act.CopyMode 'ClearPattern', act.CopyMode 'ClearSelectionMode',
+                                            act.CopyMode 'MoveToScrollbackBottom'}, pane)
+    end)
+}, {
+    key = "Home",
+    mods = "",
+    action = wezterm.action {
+        SendString = "\x1bOH"
+    }
+}, {
+    key = "End",
+    mods = "",
+    action = wezterm.action {
+        SendString = "\x1bOF"
+    }
+}}
+
+-- Configure search mode
+local copy_mode = nil
+if wezterm.gui then
+    search_mode = wezterm.gui.default_key_tables().search_mode
+    table.insert(search_mode, {
+        key = "Enter",
+        mods = "",
+        action = act.CopyMode 'NextMatch'
+    })
+    table.insert(search_mode, {
+        key = "Enter",
+        mods = "SHIFT",
+        action = act.CopyMode 'PriorMatch'
+    })
+    table.insert(search_mode, {
+        key = "c",
+        mods = "CTRL",
+        action = act.Multiple {"ScrollToBottom", {
+            CopyMode = "Close"
+        }}
+    })
+end
+-- Update key tables with new keys
+config.key_tables = {
+    search_mode = search_mode
 }
 
 return config
+-- EOF
