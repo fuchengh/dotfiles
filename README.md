@@ -33,8 +33,8 @@ EXPLORER / WINDOW NAVIGATION
 COMMENT / MULTI-CURSOR / TERMINAL
   Mode   Key               Description
   ------------------------------------
-- N      Ctrl+/ (Ctrl-_)   Toggle line comment (Comment.nvim)
-- V      Ctrl+/ (Ctrl-_)   Toggle block comment (Comment.nvim)
+- N      Ctrl+/            Toggle line comment (Comment.nvim)
+- V      Ctrl+/            Toggle block comment (Comment.nvim)
 - N      Ctrl+D            Add selection to next match (vim-visual-multi)
 - N      <Space> t         Open terminal (:terminal)
 

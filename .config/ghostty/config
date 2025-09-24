@@ -6,6 +6,7 @@ clipboard-paste-protection = false
 # Macos Settings
 macos-titlebar-style = transparent
 macos-icon = xray
+macos-option-as-alt = true
 
 # Font settings
 font-thicken = true
@@ -37,7 +38,7 @@ window-padding-y = 15,15
 # default new windows
 window-inherit-working-directory = false
 
-# ======== keybindings fix for mac =========
+# ======== my keybindings =========
 # next/prev tab
 keybind = performable:ctrl+page_down=next_tab
 keybind = performable:ctrl+page_up=previous_tab
@@ -50,3 +51,4 @@ keybind = shift+insert=paste_from_clipboard
 keybind = shift+enter=text:\x1b\r
 # ignore ctrl-enter
 keybind = ctrl+enter=ignore
+
