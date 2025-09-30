@@ -57,6 +57,8 @@ call plug#begin(stdpath('data') . '/plugged')
   Plug 'akinsho/bufferline.nvim', {'tag': '*'}
   Plug 'petertriho/nvim-scrollbar'
   Plug 'gorbit99/codewindow.nvim'
+  Plug 'dense-analysis/ale'
+  Plug 'kevinhwang91/nvim-hlslens'
 
   " LSP baseline
   Plug 'williamboman/mason.nvim'
@@ -185,15 +187,6 @@ end
 -- Which-Key / Comment / Gitsigns
 pcall(function() require('which-key').setup({}) end)
 pcall(function() require('Comment').setup() end)
-pcall(function()
-  require('gitsigns').setup({
-    signs = {
-      add = {text = '+'}, change = {text = '~'}, delete = {text = '_'},
-      topdelete = {text = '‾'}, changedelete = {text = '~'}
-    },
-    current_line_blame = false,
-  })
-end)
 
 -- Mason + LSP (clangd) with VS Code-ish maps
 do
@@ -261,7 +254,6 @@ do
   local ok, scrollbar = pcall(require, 'nvim-scrollbar')
   if ok then
     scrollbar.setup({
-      handle = { blend = 20 }, -- subtle handle
       marks = {
         Search = { text = { '•' } },
         Error = { text = { '▎' } },
@@ -270,31 +262,13 @@ do
         Hint  = { text = { '▎' } },
         Misc  = { text = { '▎' } },
       },
-      handlers = { cursor = true, diagnostic = true, gitsigns = true, search = true },
+      handlers = { cursor = true, diagnostic = true, gitsigns = true, handle = true, search = true, ale = true },
     })
     -- Enable Git hunk marks on scrollbar (requires lewis6991/gitsigns.nvim)
     pcall(function() require('scrollbar.handlers.gitsigns').setup() end)
   end
 end
 
--- Minimap (codewindow) - auto enable, integrates with Treesitter; keep it lightweight
-do
-  local ok, codewindow = pcall(require, 'codewindow')
-  if ok then
-    codewindow.setup({
-      auto_enable = true,
-      minimap_width = 8,
-      use_treesitter = true,
-      exclude_filetypes = { 'NvimTree', 'help', 'terminal' },
-      window_border = 'single',
-      z_index = 2,
-      -- NOTE: Git change colors are shown on the scrollbar via gitsigns.
-      -- Minimap focuses on code overview for performance.
-    })
-    -- Optional default keybinds: toggle/show/hide (can keep; your own toggle also exists)
-    -- codewindow.apply_default_keybinds()
-  end
-end
 EOF
 
 syntax enable

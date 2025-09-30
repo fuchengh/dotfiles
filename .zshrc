@@ -65,7 +65,6 @@ gd_line() {
 }
 alias gd="git diff | gd_line | bat"
 alias gu="git up"
-alias grammar="aichat -r grammar -- $@"
 
 # ---------- p10k config ----------
 fpath+=${ZDOTDIR:-~}/.zsh_functions
